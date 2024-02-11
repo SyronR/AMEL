@@ -1,5 +1,51 @@
 #!/bin/bash
 
+################################################################
+## FUNCTIONS ###################################################
+################################################################
+
+captureRAM() {
+	echo ""
+	echo "##############################################"
+	echo "## Capturing RAM...                       ####"
+	echo "##############################################"
+
+	# Crear el modulo de memoria
+	sudo ./avml ./capture/memory.lime
+}
+
+createProfile() {
+	echo ""
+	echo "##############################################"
+	echo "## Install the necessary dependencies     ####"
+	echo "##############################################"
+
+	# Actualizar la lista de paquetes
+	apt update
+
+	# Instalar Dependencias esenciales
+	apt install -y linux-headers-$(uname -r) python2 zip unzip make gcc
+    
+    echo ""
+    echo "##############################################"
+    echo "## Creating profile...                    ####"
+    echo "##############################################"
+
+    # Crear el perfil de memoria
+    cd ./volatility-master/tools/linux
+    sudo make dwarf
+
+    cp /boot/System.map-$(uname -r) System.map-$(uname -r)
+    zip profile.zip ./module.dwarf ./System.map-$(uname -r)
+    mv profile.zip ../../../capture/profile.zip
+}
+
+################################################################
+## SCRIPT ######################################################
+################################################################
+
+exit=false
+
 echo "##############################################"
 echo "#### Automated Memory Extractor for Linux ####"
 echo "####           By Alberto Galvez          ####"
@@ -12,67 +58,41 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-echo ""
-echo "##############################################"
-echo "## Install the necessary dependencies     ####"
-echo "##############################################"
-
-# Actualizar la lista de paquetes
-apt update
-
-# Instalar Dependencias esenciales
-apt install -y linux-headers-$(uname -r)
-apt install -y python2
-apt install -y zip
-apt install -y unzip
-
-echo ""
-echo "##############################################"
-echo "## Capturing RAM...                       ####"
-echo "##############################################"
-
 # Crear la carpeta de captura de memoria
 mkdir capture
 
-# Crear el modulo de memoria
-sudo ./avml ./capture/memory.lime
+while [ "$exit" == false ]; do
+    read -p "Do you want to capture the RAM? (y/n): " responseRAM
 
-echo ""
-
-echo ""
-echo "###############################################"
-echo "## Do you want to create the operating     ####"
-echo "## system profile for Volatility? y/n      ####"
-echo "###############################################"
-
-exit = false
-read response
-
-while [ $exit -eq false ]; do
-    if [ "$response" -eq 'y' ]; then
-        echo ""
-        echo "##############################################"
-        echo "## Creating profile...                    ####"
-        echo "##############################################"
-
-        # Crear el perfil de memoria
-        cd ./volatility/tools/linux
-        sudo make dwarf
-
-        cp /boot/System.map-$(uname -r) System.map-$(uname -r)
-        zip profile.zip ./module.dwarf ./System.map-$(uname -r)
-        mv profile.zip ../../../capture/profile.zip
+    if [ "$responseRAM" == 'y' ]; then
+	captureRAM
         
-    elif [ "$response" -eq 'n' ]; then
-            echo ""
-            echo "##############################################"
-            echo "## Leaving the program...                 ####"
-            echo "##############################################"
-
-            $exit = true
+        exit=true
+    elif [ "$responseRAM" == 'n' ]; then
+        exit=true
     else
         echo "Enter a valid value: y/n"
     fi
-
 done
 
+exit=false
+
+while [ "$exit" == false ]; do
+    read -p "Do you want to create the profile for volatility? (y/n): " responseProfile
+
+    if [ "$responseProfile" == 'y' ]; then
+	createProfile
+        
+        exit=true
+    elif [ "$responseProfile" == 'n' ]; then
+        exit=true
+    else
+        echo "Enter a valid value: y/n"
+    fi
+done
+
+echo ""
+echo "##############################################"
+echo "## Leaving the program...                 ####"
+echo "##############################################"
+exit 0
