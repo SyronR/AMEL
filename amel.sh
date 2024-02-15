@@ -5,12 +5,12 @@
 ################################################################
 
 createDefaultFileConf() {
-    	echo "Creating the file $file with default configuration..."
-    	echo "$phrase=false" > "$file"
+	echo "Creating the file $file with default configuration..."
+	echo "$phrase=false" > "$file"
 }
 
 updateFileConf() {
-   	echo "$phrase=true" > "$file"
+	echo "$phrase=true" > "$file"
 }
 
 captureRAM() {
@@ -20,8 +20,8 @@ captureRAM() {
 	echo "##############################################"
 
 	# Create the memory module
-	sudo ./avml $dataDumpFolder/$(lsb_release -i -s)_$(uname -r)_memorydump.mem
-	
+	sudo ./avml $dataDumpFolder/$(lsb_release -i -s)_memorydump.mem
+
 	if [ $? -eq 0 ]; then
 		echo "RAM Capture completed successfully"
 	else
@@ -46,35 +46,54 @@ updateDependencies() {
 createProfile() {
 	# Check and assign the value to the variable to update the dependencies
 	if [ "$value" = "false" ]; then
-   		updateDependencies
-   		updateFileConf
-   		echo "¡Installed dependencies!"
-    
+		updateDependencies
+		updateFileConf
+		echo "¡Installed dependencies!"
+
 	elif [ "$value" = "true" ]; then
-    		echo "¡Dependencies up to date!"
-    
+		echo "¡Dependencies up to date!"
+
 	else
-    		echo "Unknown value in the file $file: $value"
-    		updateDependencies
-    		createDefaultFileConf
-    		
+		echo "Unknown value in the file $file: $value"
+		updateDependencies
+		createDefaultFileConf
+
 	fi
 
-        echo ""
-        echo "##############################################"
-        echo "## Creating profile...                    ####"
-        echo "##############################################"
+	echo ""
+	echo "##############################################"
+	echo "## Creating profile...                    ####"
+	echo "##############################################"
 
-        # Create the memory profile
-        cd ./volatility-master/tools/linux
-        make
+	# Create the memory profile
+	cd ./volatility-master/tools/linux
+	make
 
 	if [ $? -eq 0 ]; then
-    		zip $(lsb_release -i -s)_$(uname -r)_profile.zip ./module.dwarf /boot/System.map-$kernel
-        	mv $(lsb_release -i -s)_$(uname -r)_profile.zip ../../../$dataDumpFolder/$(lsb_release -i -s)_$(uname -r)_profile.zip
+		echo ""
+		echo "DWARF module build successfully"
+		
+		zip $(lsb_release -i -s)_profile.zip ./module.dwarf /boot/System.map-$kernel
+		mv $(lsb_release -i -s)_profile.zip ../../../$dataDumpFolder/$(lsb_release -i -s)_profile.zip
+		rm module.dwarf
+		cd ../../../$dataDumpFolder
+
+		if [ $(uname -m) = "x86_64" ]; then
+			echo "[DEFAULT]" > volatilityrc
+			echo "PLUGINS=." >> volatilityrc
+			echo "PROFILE=Linux$(lsb_release -i -s)_profilex64" >> volatilityrc
+			echo "LOCATION=file://$(lsb_release -i -s)_memorydump.mem" >> volatilityrc
+
+		else
+			echo "[DEFAULT]" > volatilityrc
+			echo "VOLATILITY_PLUGINS=." >> volatilityrc
+			echo "VOLATILITY_PROFILE=Linux$(lsb_release -i -s)_profilex32" >> volatilityrc
+			echo "VOLATILITY_LOCATION=file://$(lsb_release -i -s)_memorydump.mem" >> volatilityrc
+
+		fi
 	else
-    		echo -e "\e[31mFailed to create the 'dwarf' module. Something went wrong\e[0m"
-    		exit 1
+		echo -e "\e[31mFailed to create the 'dwarf' module. Something went wrong\e[0m"
+		exit 1
 	fi
 }
 
@@ -93,74 +112,67 @@ phrase="updated_dependencies"
 echo "##############################################"
 echo "#### Automated Memory Extractor for Linux ####"
 echo "####           By Alberto Galvez          ####"
-echo "####              Version 1.1             ####"
+echo "####              Version 1.2             ####"
 echo "##############################################"
 
 # Check if the user is root
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Run AMEL as administrator please"
-    exit 1
+	echo "Run AMEL as administrator please"
+	exit 1
 fi
-
 
 # Create memory capture folder
 if [ ! -d "$captureFolder" ]; then
-    mkdir $captureFolder
+	mkdir $captureFolder
 fi
-
 
 # Create data dump folder
 if [ ! -d "$dataDumpFolder" ]; then
-    mkdir $dataDumpFolder
+	mkdir $dataDumpFolder
 fi
-
 
 # Check if the conf file exists
 if [ ! -f "$file" ]; then
-    createDefaultFileConf
+	createDefaultFileConf
 fi
-
 
 # Read the value from the conf file
 value=$(grep "$phrase" "$file" | cut -d "=" -f 2)
 
-
 # Ask user about RAM capture
 while [ "$exit" == false ]; do
-    read -p "Do you want to capture the RAM? (y/n): " RAMResponse
+	read -p "Do you want to capture the RAM? (y/n): " RAMResponse
 
-    if [ "$RAMResponse" == 'y' ]; then
-	captureRAM
-        exit=true
-        
-    elif [ "$RAMResponse" == 'n' ]; then
-        exit=true
-        
-    else
-        echo "Enter a valid value: y/n"
-        
-    fi
+	if [ "$RAMResponse" == 'y' ]; then
+		captureRAM
+		exit=true
+
+	elif [ "$RAMResponse" == 'n' ]; then
+		exit=true
+
+	else
+		echo "Enter a valid value: y/n"
+
+	fi
 done
-
 
 exit=false
 
-
 # Ask user about creating the profile
 while [ "$exit" == false ]; do
-    read -p "Do you want to create the profile for volatility? (y/n): " profileResponse
+	read -p "Do you want to create the profile for volatility? (y/n): " profileResponse
 
-    if [ "$profileResponse" == 'y' ]; then
-	createProfile
-        exit=true
-        
-    elif [ "$profileResponse" == 'n' ]; then
-        exit=true
-        
-    else
-        echo "Enter a valid value: y/n"
-        
-    fi
+	if [ "$profileResponse" == 'y' ]; then
+		createProfile
+		exit=true
+
+	elif [ "$profileResponse" == 'n' ]; then
+		exit=true
+
+	else
+		echo "Enter a valid value: y/n"
+
+	fi
 done
 
 echo ""

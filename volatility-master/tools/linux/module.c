@@ -578,3 +578,4 @@ struct proc_dir_entry {
 
 struct resource resource;
 
+MODULE_LICENSE("GPL");
